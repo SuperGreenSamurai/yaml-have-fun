@@ -1,5 +1,5 @@
 # yaml-have-fun
-Cloudformation stack with Parameters (variables)
+Cloudformation stack with Parameters
 
 1. Create an ec2 instance with the name application-server
 
