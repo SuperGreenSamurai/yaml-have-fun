@@ -1,0 +1,128 @@
+#Create an ec2 instance with the name application-server
+#The server should be a windows-2022 server
+#The server should be a t2 micro
+# It should be hosted in the Northern Virginia
+# It should be connected to the VPC my-vpc, but we want to choose the vpc on launching.
+# The server clock should be set to EasternStandard Time
+# tag #development, but it could be production or qa as well. This should be enforced on launching.
+# The server needs access to a SQL Server
+
+Parameters:
+#Number Parameter with minimum and maximum
+#Used to configure a single port for the SG below
+
+  MySecurityGroupPort:
+    #The description below is the description of the parameter itself 
+    #SQL port to open 1433
+    Description: Security Groups port to open (Must be a single port between 1150-65535)
+    #When the CF Template is run, it will prompt for a number - select the port you want to open
+    Type: Number
+    MinValue: 1150
+    MaxValue: 65535
+
+#Simple String Parameter
+#This is referenced in the SG Below
+  SGDescription:
+    Description: Enable EC2 access to SQL Server
+    Type: String
+
+
+#This is referenced in the EC2 resource below
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    #These four options will be displayed when we run the CF template
+    #If you are using automation, make sure to use an allowed value
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t3.micro
+      - t3.small
+    ConstraintDescription: Choose a valid EC2 instance type.
+
+#String Parameter with an allowed pattern
+#Used to configure incoming CIDRs for one SG below
+  AllowedInboundCIDR:
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    #Below is a regex that requires three digits, then a period, etc...
+    #This forces the IP range to be configured properly
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+#Used to define the VPC that SG and Subnets are in, this is US-East-1
+  MyVPC:
+    Description: us-east-1 VPC to operate in
+    #In the console, you will click on one of your VPCs
+    Type: AWS::EC2::VPC::Id
+
+#Comma delimited list of CIDR ranges for subnets
+  SubnetCIDRs:
+    Description: "Comma-delimited list of two CIDR blocks"
+    Type: CommaDelimitedList
+    Default: "10.1.1.0/24,10.1.2.0/24"
+
+  Environment:
+    Type: String
+    Default: "development"
+    Description: Environment tag value
+
+  Application:
+    Type: String
+    Default: "MyApplication"
+    Description: Application tag value
+
+
+#create EC2 instance in us-east-1c
+Resources:
+  #Create an EC2 instance using the instance type parameter
+  applicationserver:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: us-east-1d
+      ImageId: ami-0345f44fe05216fc4
+      KeyName: aws-workshop
+      InstanceType: t2.micro
+      Tags:
+             - Key: Environment
+               Value: !Ref Environment
+             - Key: Application
+               Value: !Ref Application
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            timedatectl set-timezone America/New_York
+      #References subnet1 below. Not a parameter
+      SubnetId: !Ref Subnet1
+
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Select [0, !Ref SubnetCIDRs]
+      AvailabilityZone: us-east-1d
+
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: !Select [1, !Ref SubnetCIDRs]
+      AvailabilityZone: us-east-1d
+
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref SGDescription
+      VpcId: !Ref MyVPC
+      #the 3 refereneces below are all parameters defined above
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref MySecurityGroupPort
+          ToPort: !Ref MySecurityGroupPort
+          CidrIp: !Ref AllowedInboundCIDR
+
+
