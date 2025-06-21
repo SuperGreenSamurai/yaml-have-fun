@@ -36,5 +36,5 @@ Subnet Research
 Used >>>  172.31.164.0/24,172.31.165.0/24
 ![networking-range](https://github.com/user-attachments/assets/8f990d48-353c-4669-92d1-edbe873d2038)
 
-Completions
+Completion
 ![CF_completion](https://github.com/user-attachments/assets/4c722856-189f-4261-a718-20846b14760a)
