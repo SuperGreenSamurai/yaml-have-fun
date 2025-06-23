@@ -76,14 +76,14 @@ Parameters:
     Description: Application tag value
 
 
-#create EC2 instance in us-east-1c
+#create EC2 instance in us-east-1d
 Resources:
   #Create an EC2 instance using the instance type parameter
   applicationserver:
     Type: AWS::EC2::Instance
     Properties:
       AvailabilityZone: us-east-1d
-      ImageId: ami-0345f44fe05216fc4
+      ImageId: ami-0345f44fe05216fc4  #this is a free tier windows server
       KeyName: aws-workshop
       InstanceType: t2.micro
       Tags:
