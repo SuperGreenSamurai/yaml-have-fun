@@ -1,0 +1,48 @@
+# test.yaml - Main orchestration file for security scanning pipeline
+name: Application Security Scanning Pipeline
+version: 1.0.0
+description: Comprehensive security analysis combining SAST, SCA, and IaC scanning
+
+stages:
+  - static_analysis
+  - dependency_analysis
+  - infrastructure_analysis
+  - reporting
+
+jobs:
+  sast_scan:
+    stage: static_analysis
+    description: Static Application Security Testing
+    include:
+      - file: ./scans/sast-config.yaml
+    variables:
+      SCAN_TYPE: "code_quality"
+      CHECK_UNDEFINED_VARS: true
+      CHECK_RUNTIME_ERRORS: true
+
+  sca_scan:
+    stage: dependency_analysis
+    description: Software Composition Analysis
+    include:
+      - file: ./scans/sca-config.yaml
+    variables:
+      SCAN_TYPE: "dependencies"
+      VULNERABILITY_THRESHOLD: "high"
+
+  iac_scan:
+    stage: infrastructure_analysis
+    description: Infrastructure as Code Security Scan
+    include:
+      - file: ./scans/terraform-security.yaml
+    variables:
+      SCAN_TYPE: "terraform"
+      CHECK_MISCONFIGURATIONS: true
+
+  report_generation:
+    stage: reporting
+    include:
+      - file: ./scans/report-config.yaml
+    dependencies:
+      - sast_scan
+      - sca_scan
+      - iac_scan

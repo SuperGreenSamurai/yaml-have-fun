@@ -1,0 +1,87 @@
+name: IaC CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  lint:
+    name: cfn-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Install cfn-lint
+        run: pip install cfn-lint
+      - name: Run cfn-lint
+        run: |
+          # adjust path to your templates
+          cfn-lint templates/**/*.yaml || exit 1
+
+  security-scan:
+    name: Checkov (IaC security scan)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Install Checkov
+        run: pip install checkov
+      - name: Run Checkov for CloudFormation
+        run: |
+          # run against CloudFormation templates
+          checkov -d . --framework cfn -o json > checkov-results.json || true
+      - name: Upload Checkov results
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-results
+          path: checkov-results.json
+      - name: Fail on high/critical findings
+        run: |
+          # Basic severity fail logic; customize parsing as needed
+          python - <<'PY'
+import json,sys
+r=json.load(open('checkov-results.json'))
+sev_map={'LOW':1,'MEDIUM':2,'HIGH':3,'CRITICAL':4}
+max_allowed=2  # allow up to MEDIUM (2); set to 3 to allow HIGH
+for rec in r:
+    if sev_map.get(rec.get('check_result',{}).get('severity','LOW').upper(),0) > max_allowed:
+        print("Blocking: found high/critical Checkov result")
+        sys.exit(1)
+print("Checkov scan passed severity gates")
+PY
+
+  template-validate:
+    name: CloudFormation validate/package
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsOIDCRole
+          aws-region: us-east-1
+      - name: Validate CloudFormation templates
+        run: |
+          # run AWS validation for each template (adjust paths)
+          for f in templates/**/*.yaml; do
+            echo "Validating $f"
+            aws cloudformation validate-template --template-body file://$f || exit 1
+          done
+      - name: Package (optional)
+        run: |
+          # If you package assets to S3, do that here (example)
+          # aws cloudformation package --template-file template.yaml --s3-bucket $BUCKET --output-template-file out.yaml
+          echo "Packaging step (if required)"
